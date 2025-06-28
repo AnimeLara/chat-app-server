@@ -18,6 +18,52 @@ const userTokens = new Map();
 app.use(cors());
 app.use(express.json());
 
+// नया रूट जोड़ा गया - मुख्य पेज के लिए
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Chat Server</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          margin: 0;
+          background-color: #f0f0f0;
+        }
+        .message {
+          font-size: 3rem;
+          font-weight: bold;
+          color: #2c3e50;
+          text-align: center;
+          padding: 2rem;
+          background-color: white;
+          border-radius: 10px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .details {
+          margin-top: 1rem;
+          font-size: 1.2rem;
+          color: #7f8c8d;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="message">
+        🚀 SERVER STARTED
+        <div class="details">
+          Chat server is running on port ${PORT}
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 app.post('/save-token', (req, res) => {
   try {
     const { userId, token } = req.body;
