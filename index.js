@@ -60,6 +60,7 @@ app.get('/', (req, res) => {
           Chat server is running on port ${PORT}
         </div>
       </div>
+      <script>console.log(`📩 ${data.from} → ${data.to}: ${data.text}`);</script>
     </body>
     </html>
   `);
