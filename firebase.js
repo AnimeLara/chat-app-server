@@ -1,65 +1,39 @@
 const admin = require("firebase-admin");
+const serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG); 
 
-// Environment variables validation
-if (!process.env.FIREBASE_CONFIG) {
-  console.error("❌ FIREBASE_CONFIG environment variable is missing");
-  process.exit(1);
-}
-
-let serviceAccount;
+// Initialize Firebase Admin SDK with better error handling
 try {
-  serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    // Add your databaseURL if needed
+    // databaseURL: "your-database-url"
+  });
+  console.log("✅ Firebase Admin SDK initialized successfully");
 } catch (error) {
-  console.error("❌ Failed to parse FIREBASE_CONFIG:", error);
-  process.exit(1);
+  console.error("❌ Failed to initialize Firebase Admin SDK:", error);
+  process.exit(1); // Exit if initialization fails
 }
 
-// Enhanced initialization
-const firebaseApp = admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  // databaseURL: "your-database-url" // Uncomment if needed
-});
-
-console.log("✅ Firebase Admin SDK initialized for project:", serviceAccount.project_id);
-
-/**
- * Enhanced push notification sender with retry logic
- * @param {string} token - FCM device token
- * @param {string} messageText - Notification body text
- * @param {string} [senderName="Someone"] - Sender's name
- * @param {object} [additionalData={}] - Additional data payload
- * @returns {Promise<boolean>} - Whether the notification was sent successfully
- */
-async function sendPushNotification(
-  token, 
-  messageText, 
-  senderName = "Someone",
-  additionalData = {}
-) {
-  // Input validation
-  if (!token || typeof token !== 'string') {
-    console.error("❌ Invalid FCM token:", token);
-    return false;
-  }
-
-  // Basic token format validation
-  if (!token.startsWith('d') && !token.startsWith('f')) {
-    console.error("❌ Malformed FCM token format");
+async function sendPushNotification(token, messageData) {
+  // messageData should contain: { text, from, to, id }
+  if (!token) {
+    console.error("❌ No FCM token provided");
     return false;
   }
 
   const payload = {
     notification: {
-      title: `New message from ${senderName}`,
-      body: messageText,
+      title: `New message from ${messageData.from}`,
+      body: messageData.text,
       sound: 'default'
     },
     data: {
-      ...additionalData,
-      sender: senderName,
-      message: messageText,
-      click_action: 'FLUTTER_NOTIFICATION_CLICK',
-      timestamp: new Date().toISOString()
+      // Required for Flutter to handle the notification
+      type: 'chat',
+      text: messageData.text,
+      from: messageData.from,
+      id: messageData.id,
+      click_action: 'FLUTTER_NOTIFICATION_CLICK'
     },
     token: token,
     android: {
@@ -67,8 +41,8 @@ async function sendPushNotification(
       notification: {
         channel_id: 'high_importance_channel',
         sound: 'default',
-        icon: 'ic_notification',
-        color: '#FF0000' // Your brand color
+        icon: '@mipmap/ic_launcher', // Make sure this matches your Flutter app
+        click_action: 'FLUTTER_NOTIFICATION_CLICK'
       }
     },
     apns: {
@@ -76,11 +50,8 @@ async function sendPushNotification(
         aps: {
           sound: 'default',
           badge: 1,
-          'mutable-content': 1 // For rich notifications
+          'mutable-content': 1
         }
-      },
-      fcm_options: {
-        image: additionalData.imageUrl || '' // For iOS rich notifications
       }
     },
     webpush: {
@@ -90,39 +61,26 @@ async function sendPushNotification(
     }
   };
 
-  // Add retry logic for transient errors
-  const maxRetries = 3;
-  let attempt = 0;
-  
-  while (attempt < maxRetries) {
-    try {
-      attempt++;
-      const response = await admin.messaging().send(payload);
-      console.log(`✅ Notification sent (attempt ${attempt}):`, response);
-      return true;
-    } catch (error) {
-      console.error(`❌ Attempt ${attempt} failed:`, error.message);
-      
-      if (error.code === 'messaging/invalid-registration-token' || 
-          error.code === 'messaging/registration-token-not-registered') {
-        console.log("⚠️ Removing invalid token from database");
-        // Add your logic to remove invalid token here
-        return false;
-      }
-      
-      // Wait before retrying (exponential backoff)
-      if (attempt < maxRetries) {
-        const delay = Math.pow(2, attempt) * 1000;
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+  try {
+    const response = await admin.messaging().send(payload);
+    console.log("✅ Successfully sent notification:", response);
+    return true;
+  } catch (error) {
+    console.error("❌ Error sending notification:", error);
+    
+    // Handle invalid tokens
+    if (error.code === 'messaging/invalid-registration-token' || 
+        error.code === 'messaging/registration-token-not-registered') {
+      console.log("⚠️ Removing invalid token from database");
+      // Add logic here to remove the invalid token from your database
     }
+    
+    return false;
   }
-  
-  return false;
 }
 
-module.exports = {
+// Improved module export
+module.exports = { 
   sendPushNotification,
-  admin,
-  firebaseApp
+  admin
 };
