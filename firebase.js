@@ -15,33 +15,34 @@ try {
 }
 
 async function sendPushNotification(token, messageData) {
-  // messageData should contain: { text, from, to, id }
   if (!token) {
     console.error("❌ No FCM token provided");
     return false;
   }
 
+  // Convert all data values to strings
+  const stringData = {
+    type: 'chat',
+    text: String(messageData.text),
+    from: String(messageData.from),
+    id: String(messageData.id),
+    click_action: 'FLUTTER_NOTIFICATION_CLICK'
+  };
+
   const payload = {
     notification: {
       title: `New message from ${messageData.from}`,
-      body: messageData.text,
+      body: String(messageData.text), // Ensure body is string
       sound: 'default'
     },
-    data: {
-      // Required for Flutter to handle the notification
-      type: 'chat',
-      text: messageData.text,
-      from: messageData.from,
-      id: messageData.id,
-      click_action: 'FLUTTER_NOTIFICATION_CLICK'
-    },
+    data: stringData, // Use the string-converted data
     token: token,
     android: {
       priority: 'high',
       notification: {
         channel_id: 'high_importance_channel',
         sound: 'default',
-        icon: '@mipmap/ic_launcher', // Make sure this matches your Flutter app
+        icon: '@mipmap/ic_launcher',
         click_action: 'FLUTTER_NOTIFICATION_CLICK'
       }
     },
@@ -53,11 +54,6 @@ async function sendPushNotification(token, messageData) {
           'mutable-content': 1
         }
       }
-    },
-    webpush: {
-      headers: {
-        Urgency: 'high'
-      }
     }
   };
 
@@ -68,11 +64,10 @@ async function sendPushNotification(token, messageData) {
   } catch (error) {
     console.error("❌ Error sending notification:", error);
     
-    // Handle invalid tokens
     if (error.code === 'messaging/invalid-registration-token' || 
         error.code === 'messaging/registration-token-not-registered') {
       console.log("⚠️ Removing invalid token from database");
-      // Add logic here to remove the invalid token from your database
+      // Add token removal logic here
     }
     
     return false;
